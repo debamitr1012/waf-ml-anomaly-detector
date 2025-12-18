@@ -1,0 +1,111 @@
+# ML-WAF Configuration
+
+# API Settings
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  debug: false
+
+# Dashboard Settings  
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+  secret_key: "change-this-in-production"
+
+# Admin Credentials (Change in production!)
+admin:
+  username: "admin"
+  password: "changeme"
+
+# ML Models
+models:
+  directory: "models"
+  supervised:
+    enabled: true
+    type: "xgboost"
+    retrain_interval_hours: 24
+  unsupervised:
+    enabled: true
+    type: "isolation_forest"
+    contamination: 0.1
+  semi_supervised:
+    enabled: true
+    type: "autoencoder"
+    epochs: 100
+
+# Feature Engineering
+features:
+  enabled_categories:
+    - basic
+    - url
+    - headers
+    - body
+    - patterns
+    - temporal
+
+# Anomaly Detection
+detection:
+  ensemble_weights:
+    supervised: 0.4
+    unsupervised: 0.3
+    semi_supervised: 0.3
+  thresholds:
+    anomaly_score: 0.5
+    high_threat: 0.8
+    critical_threat: 0.9
+
+# Security Rules
+rules:
+  auto_generation: true
+  confidence_threshold: 0.7
+  max_rules_per_batch: 10
+  formats:
+    - modsecurity
+    - nginx
+    - generic
+
+# Continuous Learning
+continuous_learning:
+  enabled: true
+  retrain_interval_hours: 24
+  min_samples_for_retrain: 1000
+  backup_models: true
+
+# Baselining
+baselining:
+  enabled: true
+  window_minutes: 60
+  min_samples: 100
+
+# Database
+database:
+  url: "sqlite:///waf_ml.db"
+  # For PostgreSQL:
+  # url: "postgresql://user:password@localhost/waf_ml_db"
+
+# Redis (for caching and queues)
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+
+# Logging
+logging:
+  level: "INFO"
+  directory: "logs"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# Performance
+performance:
+  max_concurrent_analyses: 100
+  request_timeout_seconds: 30
+  cache_ttl_seconds: 300
+
+# Monitoring
+monitoring:
+  metrics_enabled: true
+  prometheus_port: 9090
+  health_check_interval_seconds: 30

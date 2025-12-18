@@ -1,0 +1,113 @@
+# Core ML and Data Science
+numpy>=1.26.0
+pandas>=2.1.0
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+tensorflow>=2.15.0
+imbalanced-learn>=0.11.0
+
+# Explainable AI
+shap==0.42.1
+lime==0.2.0.1
+
+# Web Framework and API
+flask==2.3.3
+flask-cors==4.0.0
+flask-socketio==5.3.4
+flask-login==0.6.2
+flask-wtf==1.1.1
+gunicorn==21.2.0
+python-socketio==5.9.0
+
+# Database
+sqlalchemy==2.0.20
+psycopg2-binary==2.9.7
+alembic==1.11.3
+
+# Caching and Message Queue
+redis==5.0.0
+celery==5.3.1
+
+# Data Processing
+scipy==1.11.2
+joblib==1.3.2
+nltk==3.8.1
+python-dateutil==2.8.2
+
+# Network and Security
+cryptography==41.0.3
+requests==2.31.0
+urllib3==2.0.4
+python-dotenv==1.0.0
+
+# Monitoring and Logging
+prometheus-client==0.17.1
+python-json-logger==2.0.7
+colorlog==6.7.0
+
+# Visualization (for dashboard)
+plotly==5.16.1
+matplotlib==3.7.2
+seaborn==0.12.2
+
+# Configuration
+pyyaml==6.0.1
+python-decouple==3.8
+
+# Testing
+pytest==7.4.0
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1
+faker==19.4.0
+locust==2.15.1
+
+# Code Quality
+black==23.7.0
+flake8==6.1.0
+pylint==2.17.5
+mypy==1.5.1
+
+# Utilities
+click==8.1.7
+tqdm==4.66.1
+jsonschema==4.19.0
+python-multipart==0.0.6
+
+# Traffic Analysis
+scapy==2.5.0
+dpkt==1.9.8
+
+# Time Series
+statsmodels==0.14.0
+
+# API Documentation
+flasgger==0.9.7.1
+apispec==6.3.0
+
+# Authentication
+pyjwt==2.8.0
+bcrypt==4.0.1
+
+# ML Model Serving
+fastapi==0.103.1
+uvicorn==0.23.2
+pydantic==2.3.0
+
+# Async Support
+aiohttp==3.8.5
+asyncio==3.4.3
+
+# Data Validation
+marshmallow==3.20.1
+cerberus==1.3.5
+
+# Feature Engineering
+featuretools==1.28.0
+category-encoders==2.6.2
+
+# Model Versioning
+mlflow==2.6.0
+
+# Performance Profiling
+py-spy==0.3.14
+memory-profiler==0.61.0
