@@ -15,16 +15,17 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
-from core.analyzer import AnomalyAnalyzer
-from core.baseline import BaselineManager
-from api.routes import setup_routes
-from utils.logger import setup_logger
-from utils.metrics import MetricsCollector
-from database.models import init_database
-from ml.continuous_learning import ContinuousLearningEngine
+from src.core.analyzer import AnomalyAnalyzer
+from src.core.baseline import BaselineManager
+from src.api.routes import setup_routes
+from src.utils.logger import setup_logger
+from src.utils.metrics import MetricsCollector
+from src.database.models import init_database
+from src.ml.continuous_learning import ContinuousLearningEngine
 
 # Initialize logger
 logger = setup_logger(__name__)

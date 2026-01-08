@@ -7,9 +7,9 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from core.analyzer import AnomalyAnalyzer
-from rules.generator import RuleGenerator
-from utils.metrics import MetricsCollector
+from src.core.analyzer import AnomalyAnalyzer
+from src.rules.generator import RuleGenerator
+from src.utils.metrics import MetricsCollector
 
 # Create routers
 api_router = APIRouter(prefix="/api/v1")

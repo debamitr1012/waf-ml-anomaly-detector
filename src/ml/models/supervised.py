@@ -11,7 +11,7 @@ from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 
-from utils.logger import get_logger
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -91,13 +91,8 @@ class SupervisedModel:
             self.model = grid_search.best_estimator_
             logger.info(f"Best parameters: {grid_search.best_params_}")
         else:
-            # Standard training
-            self.model.fit(
-                X_tr, y_tr,
-                eval_set=[(X_val, y_val)],
-                early_stopping_rounds=10,
-                verbose=False
-            )
+            # Standard training (no hyperparameter tuning)
+            self.model.fit(X_tr, y_tr, verbose=False)
         
         # Store feature names
         self.feature_names = feature_names

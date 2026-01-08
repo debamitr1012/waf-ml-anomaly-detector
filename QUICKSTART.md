@@ -19,23 +19,20 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### 3. Generate Training Data
+### 3. Train Models with Dataset1
 ```powershell
-python scripts\generate_training_data.py --normal 5000 --anomalous 500 --output data\training\synthetic_traffic.csv
+python src\ml\train.py --data dataset1\Train_data.csv --output models
 ```
 
-### 4. Train Models
-```powershell
-python src\ml\train.py --data data\training\synthetic_traffic.csv --output models
-```
+**Note:** Training uses KDD Cup 1999 network intrusion dataset (25,192 samples) for robust anomaly detection model development.
 
-### 5. Start ML API
+### 4. Start ML API
 ```powershell
 # In terminal 1
 python src\main.py
 ```
 
-### 6. Start Dashboard (Next.js)
+### 5. Start Dashboard (Next.js)
 ```powershell
 # In terminal 2
 cd dashboard
@@ -44,13 +41,13 @@ npm run dev
 cd ..
 ```
 
-### 7. Generate Test Traffic
+### 6. Generate Test Traffic
 ```powershell
 # In terminal 3
 python scripts\generate_traffic.py --normal 100 --anomalous 10
 ```
 
-### 8. Access Dashboard
+### 7. Access Dashboard
 Open browser to: http://localhost:3000
 
 **Login Credentials:**

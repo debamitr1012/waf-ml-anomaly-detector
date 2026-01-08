@@ -9,7 +9,7 @@ from pathlib import Path
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import classification_report, roc_auc_score
 
-from utils.logger import get_logger
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -1,30 +1,31 @@
 """
-Semi-supervised learning model using AutoEncoder for behavioral analysis.
+Semi-supervised learning model using sklearn's manifold learning for behavioral analysis.
 """
 
 import numpy as np
 from typing import Optional, Dict, Any, Tuple
 import joblib
 from pathlib import Path
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers, Model
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
 
-from utils.logger import get_logger
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class SemiSupervisedModel:
     """
-    AutoEncoder-based semi-supervised model for behavioral anomaly detection.
-    Learns normal traffic patterns and detects deviations.
+    Manifold-based semi-supervised model for behavioral anomaly detection.
+    Uses dimensionality reduction and reconstruction error for anomaly detection.
     """
     
     def __init__(self, input_dim: Optional[int] = None):
         self.input_dim = input_dim
-        self.model: Optional[Model] = None
+        self.pca_model: Optional[PCA] = None
+        self.scaler: Optional[StandardScaler] = None
         self.threshold = 0.0
         self.feature_names = []
         self.is_trained = False
@@ -32,55 +33,17 @@ class SemiSupervisedModel:
         # Reconstruction error statistics
         self.error_mean = 0.0
         self.error_std = 1.0
+        self.n_components = 0
     
-    def _build_model(self, input_dim: int) -> Model:
+    def _build_model(self) -> None:
         """
-        Build AutoEncoder architecture.
-        
-        Args:
-            input_dim: Number of input features
-        
-        Returns:
-            Compiled Keras model
+        Build PCA-based dimensionality reduction model.
         """
-        # Encoder
-        encoder_input = layers.Input(shape=(input_dim,), name='encoder_input')
-        
-        # Encoding layers with dropout for regularization
-        x = layers.Dense(128, activation='relu', name='encoder_layer1')(encoder_input)
-        x = layers.BatchNormalization()(x)
-        x = layers.Dropout(0.2)(x)
-        
-        x = layers.Dense(64, activation='relu', name='encoder_layer2')(x)
-        x = layers.BatchNormalization()(x)
-        x = layers.Dropout(0.2)(x)
-        
-        # Bottleneck (latent space)
-        encoded = layers.Dense(32, activation='relu', name='bottleneck')(x)
-        
-        # Decoder
-        x = layers.Dense(64, activation='relu', name='decoder_layer1')(encoded)
-        x = layers.BatchNormalization()(x)
-        x = layers.Dropout(0.2)(x)
-        
-        x = layers.Dense(128, activation='relu', name='decoder_layer2')(x)
-        x = layers.BatchNormalization()(x)
-        x = layers.Dropout(0.2)(x)
-        
-        # Output layer
-        decoded = layers.Dense(input_dim, activation='sigmoid', name='decoder_output')(x)
-        
-        # Create model
-        autoencoder = Model(encoder_input, decoded, name='autoencoder')
-        
-        # Compile with appropriate loss and optimizer
-        autoencoder.compile(
-            optimizer=keras.optimizers.Adam(learning_rate=0.001),
-            loss='mse',
-            metrics=['mae']
-        )
-        
-        return autoencoder
+        # Initialize scaler and PCA
+        self.scaler = StandardScaler()
+        # Use reasonable number of components
+        self.n_components = min(32, int(0.95 * self.input_dim)) if self.input_dim else 32
+        self.pca_model = PCA(n_components=self.n_components, random_state=42)
     
     async def train(
         self,
@@ -91,59 +54,36 @@ class SemiSupervisedModel:
         batch_size: int = 256
     ) -> Dict[str, Any]:
         """
-        Train the AutoEncoder on normal traffic.
+        Train the manifold-based semi-supervised model on normal traffic.
         
         Args:
             X_train: Training features (normal traffic)
             feature_names: Names of features
             X_val: Validation features (optional)
-            epochs: Number of training epochs
-            batch_size: Batch size for training
+            epochs: Ignored (for API compatibility)
+            batch_size: Ignored (for API compatibility)
         
         Returns:
             Training history
         """
-        logger.info("Training semi-supervised AutoEncoder model...")
+        logger.info("Training semi-supervised manifold model...")
         
         # Build model
         self.input_dim = X_train.shape[1]
-        self.model = self._build_model(self.input_dim)
+        self._build_model()
         self.feature_names = feature_names
         
-        # Log model architecture
-        logger.info(f"Model architecture: {self.model.summary()}")
+        logger.info(f"Feature dimension: {self.input_dim}")
+        logger.info(f"PCA components: {self.n_components}")
         
-        # Callbacks
-        callbacks = [
-            EarlyStopping(
-                monitor='val_loss' if X_val is not None else 'loss',
-                patience=10,
-                restore_best_weights=True,
-                verbose=1
-            ),
-            ReduceLROnPlateau(
-                monitor='val_loss' if X_val is not None else 'loss',
-                factor=0.5,
-                patience=5,
-                verbose=1
-            )
-        ]
+        # Fit scaler and PCA on training data
+        X_scaled = self.scaler.fit_transform(X_train)
+        self.pca_model.fit(X_scaled)
         
-        # Train (AutoEncoder tries to reconstruct input)
-        validation_data = (X_val, X_val) if X_val is not None else None
-        
-        history = self.model.fit(
-            X_train, X_train,
-            epochs=epochs,
-            batch_size=batch_size,
-            validation_data=validation_data,
-            callbacks=callbacks,
-            verbose=1
-        )
-        
-        # Calculate reconstruction errors on training data
-        reconstructions = self.model.predict(X_train)
-        reconstruction_errors = np.mean(np.square(X_train - reconstructions), axis=1)
+        # Calculate reconstruction errors on training data (normal traffic)
+        X_projected = self.pca_model.transform(X_scaled)
+        X_reconstructed = self.pca_model.inverse_transform(X_projected)
+        reconstruction_errors = np.mean(np.square(X_scaled - X_reconstructed), axis=1)
         
         # Set threshold (e.g., 95th percentile)
         self.threshold = np.percentile(reconstruction_errors, 95)
@@ -153,17 +93,12 @@ class SemiSupervisedModel:
         self.is_trained = True
         
         metrics = {
-            'final_loss': float(history.history['loss'][-1]),
-            'final_mae': float(history.history['mae'][-1]),
+            'reconstruction_error_mean': float(self.error_mean),
+            'reconstruction_error_std': float(self.error_std),
             'threshold': float(self.threshold),
-            'error_mean': float(self.error_mean),
-            'error_std': float(self.error_std),
-            'epochs_trained': len(history.history['loss'])
+            'n_components': self.n_components,
+            'mse': float(np.mean(reconstruction_errors))
         }
-        
-        if X_val is not None:
-            metrics['final_val_loss'] = float(history.history['val_loss'][-1])
-            metrics['final_val_mae'] = float(history.history['val_mae'][-1])
         
         logger.info(f"Semi-supervised model training complete. Threshold: {self.threshold:.4f}")
         
@@ -179,7 +114,7 @@ class SemiSupervisedModel:
         Returns:
             Anomaly probability (0-1)
         """
-        if not self.is_trained:
+        if not self.is_trained or self.pca_model is None:
             logger.warning("Model not trained, returning default score")
             return 0.5
         
@@ -188,11 +123,13 @@ class SemiSupervisedModel:
             if features.ndim == 1:
                 features = features.reshape(1, -1)
             
-            # Reconstruct input
-            reconstruction = self.model.predict(features, verbose=0)
+            # Scale and project
+            X_scaled = self.scaler.transform(features)
+            X_projected = self.pca_model.transform(X_scaled)
+            X_reconstructed = self.pca_model.inverse_transform(X_projected)
             
             # Calculate reconstruction error
-            error = np.mean(np.square(features - reconstruction))
+            error = np.mean(np.square(X_scaled - X_reconstructed))
             
             # Normalize error to probability
             normalized_error = (error - self.error_mean) / (self.error_std + 1e-10)
@@ -208,15 +145,17 @@ class SemiSupervisedModel:
     
     async def predict_batch(self, features: np.ndarray) -> np.ndarray:
         """Predict for multiple samples."""
-        if not self.is_trained:
+        if not self.is_trained or self.pca_model is None:
             return np.full(len(features), 0.5)
         
         try:
-            # Reconstruct inputs
-            reconstructions = self.model.predict(features, verbose=0)
+            # Scale and project
+            X_scaled = self.scaler.transform(features)
+            X_projected = self.pca_model.transform(X_scaled)
+            X_reconstructed = self.pca_model.inverse_transform(X_projected)
             
             # Calculate reconstruction errors
-            errors = np.mean(np.square(features - reconstructions), axis=1)
+            errors = np.mean(np.square(X_scaled - X_reconstructed), axis=1)
             
             # Normalize and convert to probabilities
             normalized_errors = (errors - self.error_mean) / (self.error_std + 1e-10)
@@ -230,14 +169,16 @@ class SemiSupervisedModel:
     
     def get_reconstruction_error(self, features: np.ndarray) -> float:
         """Get raw reconstruction error for debugging."""
-        if not self.is_trained:
+        if not self.is_trained or self.pca_model is None:
             return 0.0
         
         if features.ndim == 1:
             features = features.reshape(1, -1)
         
-        reconstruction = self.model.predict(features, verbose=0)
-        error = np.mean(np.square(features - reconstruction))
+        X_scaled = self.scaler.transform(features)
+        X_projected = self.pca_model.transform(X_scaled)
+        X_reconstructed = self.pca_model.inverse_transform(X_projected)
+        error = np.mean(np.square(X_scaled - X_reconstructed))
         
         return float(error)
     
@@ -247,41 +188,35 @@ class SemiSupervisedModel:
             logger.warning("Cannot save untrained model")
             return
         
-        # Save Keras model
-        model_path = path.parent / f"{path.stem}_keras.h5"
-        self.model.save(model_path)
-        
-        # Save metadata
-        metadata = {
+        # Save all models together
+        models_data = {
+            'scaler': self.scaler,
+            'pca_model': self.pca_model,
             'input_dim': self.input_dim,
+            'n_components': self.n_components,
             'threshold': self.threshold,
             'feature_names': self.feature_names,
             'is_trained': self.is_trained,
             'error_mean': self.error_mean,
-            'error_std': self.error_std,
-            'model_path': str(model_path)
+            'error_std': self.error_std
         }
         
-        joblib.dump(metadata, path)
+        joblib.dump(models_data, path)
         logger.info(f"Semi-supervised model saved to {path}")
     
     async def load(self, path: Path):
         """Load model from disk."""
-        # Load metadata
-        metadata = joblib.load(path)
+        # Load all models
+        models_data = joblib.load(path)
         
-        self.input_dim = metadata['input_dim']
-        self.threshold = metadata['threshold']
-        self.feature_names = metadata['feature_names']
-        self.is_trained = metadata['is_trained']
-        self.error_mean = metadata['error_mean']
-        self.error_std = metadata['error_std']
-        
-        # Load Keras model
-        model_path = Path(metadata['model_path'])
-        self.model = keras.models.load_model(
-            model_path,
-            custom_objects={'mse': keras.losses.MeanSquaredError()}
-        )
+        self.scaler = models_data['scaler']
+        self.pca_model = models_data['pca_model']
+        self.input_dim = models_data['input_dim']
+        self.n_components = models_data['n_components']
+        self.threshold = models_data['threshold']
+        self.feature_names = models_data['feature_names']
+        self.is_trained = models_data['is_trained']
+        self.error_mean = models_data['error_mean']
+        self.error_std = models_data['error_std']
         
         logger.info(f"Semi-supervised model loaded from {path}")

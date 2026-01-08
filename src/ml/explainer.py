@@ -1,13 +1,19 @@
 """
 Explainable AI module using SHAP and LIME for model interpretation.
+Fallback to simple feature importance if libraries not available.
 """
 
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional
-import shap
 
-from utils.logger import get_logger
+try:
+    import shap
+    HAS_SHAP = True
+except ImportError:
+    HAS_SHAP = False
+
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -29,6 +35,11 @@ class ExplainableAI:
             model: Trained ML model
             background_data: Sample of normal traffic for baseline
         """
+        if not HAS_SHAP:
+            logger.warning("SHAP not installed, using fallback explanations")
+            self.background_data = background_data
+            return
+        
         try:
             # Use TreeExplainer for tree-based models (XGBoost)
             self.shap_explainer = shap.TreeExplainer(model.model)

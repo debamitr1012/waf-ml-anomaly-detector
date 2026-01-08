@@ -1,5 +1,5 @@
 """
-Model training script for initial setup.
+Quick model training script - uses default hyperparameters (no tuning).
 """
 
 import argparse
@@ -24,10 +24,9 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-async def train_models(data_file: str, output_dir: str):
+async def train_models_quick(data_file: str, output_dir: str):
     """
-    Train all ML models from a dataset.
-    Supports both KDD Cup 1999 format and WAF traffic format.
+    Quick training with default hyperparameters (no tuning).
     
     Args:
         data_file: Path to training data CSV
@@ -50,44 +49,20 @@ async def train_models(data_file: str, output_dir: str):
             # Convert to binary labels
             df['is_anomaly'] = (df['class'] != 'normal').astype(int)
             
-            # Extract numeric features
+            # Extract numeric features (EXCLUDE the 'is_anomaly' column we just created)
             feature_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            # Remove 'is_anomaly' from features since it's our target variable
+            if 'is_anomaly' in feature_cols:
+                feature_cols.remove('is_anomaly')
+            
             X = df[feature_cols].values
             y = df['is_anomaly'].values
             feature_names = feature_cols
             
             logger.info(f"[OK] Extracted {len(feature_cols)} numeric features")
         else:
-            # WAF traffic format
-            logger.info("Detected WAF traffic format")
-            preprocessor = TrafficPreprocessor()
-            
-            # Extract features
-            logger.info("Extracting features from traffic data...")
-            features_list = []
-            labels = []
-            
-            for idx, row in df.iterrows():
-                if idx % 1000 == 0:
-                    logger.info(f"  Processing {idx}/{len(df)}...")
-                
-                request_data = {
-                    'source_ip': row.get('source_ip', '0.0.0.0'),
-                    'method': row.get('method', 'GET'),
-                    'path': row.get('path', '/'),
-                    'headers': {},
-                    'body': row.get('body', ''),
-                    'timestamp': row.get('timestamp', '')
-                }
-                
-                features = await preprocessor.extract_features(request_data)
-                features_list.append(features)
-                labels.append(int(row.get('is_anomaly', 0)))
-            
-            X = np.array(features_list)
-            y = np.array(labels)
-            feature_names = preprocessor.get_feature_names()
-            logger.info(f"[OK] Extracted features: {X.shape}")
+            logger.error("Dataset format not supported (expected KDD format)")
+            raise ValueError("Unsupported dataset format")
         
         logger.info(f"[OK] Feature shape: {X.shape}")
         logger.info(f"[OK] Normal samples: {np.sum(y == 0)} ({np.sum(y == 0)/len(y)*100:.1f}%)")
@@ -104,9 +79,9 @@ async def train_models(data_file: str, output_dir: str):
         output_path.mkdir(parents=True, exist_ok=True)
         logger.info(f"[OK] Output directory: {output_path.absolute()}")
         
-        # Train supervised model
+        # Train supervised model - WITHOUT hyperparameter tuning
         logger.info("\n" + "="*60)
-        logger.info("[TRAIN] Supervised Model (XGBoost)")
+        logger.info("[TRAIN] Supervised Model (XGBoost) - Quick Mode")
         logger.info("   Purpose: Detect known attack patterns")
         logger.info("="*60)
         supervised = SupervisedModel()
@@ -114,14 +89,17 @@ async def train_models(data_file: str, output_dir: str):
             X_train, y_train,
             feature_names,
             validation_split=0.2,
-            tune_hyperparameters=True
+            tune_hyperparameters=False  # SKIP tuning for speed
         )
         logger.info(f"[OK] Supervised Model Metrics:")
         for key, value in metrics.items():
             if isinstance(value, (list, tuple)):
                 logger.info(f"  - {key}: {value}")
             else:
-                logger.info(f"  - {key}: {value:.4f}")
+                try:
+                    logger.info(f"  - {key}: {value:.4f}")
+                except (TypeError, ValueError):
+                    logger.info(f"  - {key}: {value}")
         await supervised.save(output_path / "supervised_model.pkl")
         logger.info(f"[OK] Model saved: {output_path / 'supervised_model.pkl'}")
         
@@ -143,13 +121,16 @@ async def train_models(data_file: str, output_dir: str):
             if isinstance(value, (list, tuple)):
                 logger.info(f"  - {key}: {value}")
             else:
-                logger.info(f"  - {key}: {value:.4f}")
+                try:
+                    logger.info(f"  - {key}: {value:.4f}")
+                except (TypeError, ValueError):
+                    logger.info(f"  - {key}: {value}")
         await unsupervised.save(output_path / "unsupervised_model.pkl")
         logger.info(f"[OK] Model saved: {output_path / 'unsupervised_model.pkl'}")
         
-        # Train semi-supervised model (AutoEncoder on normal traffic)
+        # Train semi-supervised model (PCA-based on normal traffic)
         logger.info("\n" + "="*60)
-        logger.info("[TRAIN] Semi-Supervised Model (AutoEncoder)")
+        logger.info("[TRAIN] Semi-Supervised Model (PCA-based)")
         logger.info("   Purpose: Learn normal behavior patterns")
         logger.info("="*60)
         X_normal_train, X_normal_val = train_test_split(
@@ -169,7 +150,10 @@ async def train_models(data_file: str, output_dir: str):
             if isinstance(value, (list, tuple)):
                 logger.info(f"  - {key}: {value}")
             else:
-                logger.info(f"  - {key}: {value:.4f}")
+                try:
+                    logger.info(f"  - {key}: {value:.4f}")
+                except (TypeError, ValueError):
+                    logger.info(f"  - {key}: {value}")
         await semi_supervised.save(output_path / "semi_supervised_model.pkl")
         logger.info(f"[OK] Model saved: {output_path / 'semi_supervised_model.pkl'}")
         
@@ -188,7 +172,7 @@ async def train_models(data_file: str, output_dir: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Train WAF ML models')
+    parser = argparse.ArgumentParser(description='Quick train WAF ML models (no hyperparameter tuning)')
     parser.add_argument(
         '--data',
         required=True,
@@ -203,7 +187,7 @@ def main():
     args = parser.parse_args()
     
     # Run training
-    asyncio.run(train_models(args.data, args.output))
+    asyncio.run(train_models_quick(args.data, args.output))
 
 
 if __name__ == '__main__':
